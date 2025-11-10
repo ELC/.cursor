@@ -1,0 +1,11 @@
+---
+globs: *.md
+alwaysApply: false
+---
+
+Whenever working with markdown files, ensure the text is wrapped to 80
+characters. Run the following command:
+
+```
+uv run --with mdformat_frontmatter==2.0.8 mdformat --wrap 80 <file path>
+```

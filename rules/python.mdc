@@ -1,0 +1,153 @@
+---
+globs: '*.py'
+alwaysApply: true
+---
+
+# Python Coding Standards
+
+Follow these Python coding standards for all Python code:
+
+## Type Hints
+
+- ALL functions, methods, and classes MUST have type hints
+- NEVER use `Any` type - always use specific types
+- For input arguments, prefer abstract protocols (`Sequence`, `Mapping`,
+  `Iterable`) over concrete types (`list`, `dict`)
+- Use the minimal required protocol based on actual usage in the code
+- Return types should ALWAYS be concrete types (e.g., `list[UserModel]`,
+  `dict[str, int]`)
+- Import protocols from `collections.abc` (e.g.,
+  `from collections.abc import Sequence, Mapping`)
+
+## Structured Data
+
+- ALWAYS use Pydantic V2 syntax (NOT V1)
+- ALWAYS prefer Pydantic `BaseModel` over dictionaries for structured data
+- Use `TypedDict` only when Pydantic models are not possible:
+  - Legacy code that cannot be refactored
+  - Third-party libraries expecting plain dicts
+  - Very simple key-value mappings
+- Prefer IMMUTABLE state - use `frozen=True` on BaseModels whenever possible
+- For settings and environment variables, ALWAYS use Pydantic `Settings` from `pydantic_settings`
+
+## File Operations
+
+- ALWAYS use `pathlib.Path` for path interactions
+- Prefer `read_text()` and `write_text()` over `open()`
+- Use `read_bytes()` and `write_bytes()` for binary files
+
+## Dependency Inversion
+
+- Functions should depend on ABSTRACTIONS (protocols) instead of concrete classes
+- Abstract classes and protocols MUST have at least 2 concrete implementations
+- If only 1 implementation exists, do NOT create an abstraction
+
+## Testing
+
+- For third-party integrations (Azure Blobs, Redis, S3, etc.), use FAKES
+- ALWAYS prefer third-party fake libraries over custom implementations
+  - Example: Use `fakeredis` instead of creating your own Redis fake
+  - Example: Use `moto` for AWS services
+- Fakes provide better coverage and maintenance than custom mocks
+
+## Code Style
+
+- Use clear, descriptive names that document behavior - NO comments needed
+- Use descriptive variable names instead of comments
+- Prefer FUNCTIONAL approach - avoid classes when functions suffice
+- Keep functions small and focused on a single responsibility
+
+## Examples
+
+### Good - Frozen Models and Pydantic Settings (V2 Syntax)
+
+```python
+from pydantic import BaseModel, ConfigDict
+from pydantic_settings import BaseSettings
+
+
+class User(BaseModel, frozen=True):
+    name: str
+    email: str
+    age: int
+
+
+class AppSettings(BaseSettings):
+    model_config = ConfigDict(env_file=".env")
+    
+    database_url: str
+    api_key: str
+    debug: bool = False
+```
+
+### Good - Pathlib for File Operations
+
+```python
+from pathlib import Path
+
+
+def save_report(report_path: Path, content: str) -> None:
+    report_path.write_text(content, encoding="utf-8")
+
+
+def load_config(config_path: Path) -> str:
+    return config_path.read_text(encoding="utf-8")
+```
+
+### Good - Dependency on Protocols
+
+```python
+from typing import Protocol
+from collections.abc import Iterable
+from pydantic import BaseModel
+
+
+class User(BaseModel, frozen=True):
+    name: str
+    email: str
+
+
+class UserRepository(Protocol):
+    def get_users(self) -> Iterable[User]: ...
+    def save_user(self, user: User) -> None: ...
+
+
+class DatabaseUserRepository:
+    def get_users(self) -> Iterable[User]:
+        # Real database implementation
+        ...
+    
+    def save_user(self, user: User) -> None:
+        ...
+
+
+class InMemoryUserRepository:
+    def get_users(self) -> Iterable[User]:
+        # In-memory implementation for testing
+        ...
+    
+    def save_user(self, user: User) -> None:
+        ...
+
+
+def process_users(repo: UserRepository) -> list[str]:
+    return [user.email for user in repo.get_users()]
+```
+
+### Bad - Using Any and plain dicts
+
+```python
+from typing import Any
+
+
+def process_users(users: Any) -> Any:
+    return [user["email"] for user in users]
+```
+
+### Bad - Depending on Concrete Classes
+
+```python
+# Bad: Function depends on concrete class
+def process_users(repo: DatabaseUserRepository) -> list[str]:
+    return [user.email for user in repo.get_users()]
+```
